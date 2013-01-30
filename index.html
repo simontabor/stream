@@ -1,0 +1,209 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1024" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Tweets | Simon Tabor</title>
+  
+  <meta name="description" content="Twimpress shows a stream of tweets for any search term using impress.js" />
+  <meta name="author" content="Simon Tabor" />
+
+  <link href="css/style.css" rel="stylesheet" />
+
+</head>
+
+<body class="impress-not-supported">
+  <h1>Tweets</h1>
+
+  <div class="fallback-message">
+    <p>Your browser <b>doesn't support the features required</b> by impress.js, so you are presented with a simplified version of this presentation.</p>
+    <p>For the best experience please use the latest <b>Chrome</b>, <b>Safari</b> or <b>Firefox</b> browser.</p>
+  </div>
+
+  <div id="impress">
+
+  </div>
+
+  <form id="settings">
+    <button class="toggle">&times;</button>
+    <h4>Settings</h4>
+    <div>
+      <label for="name">Search</label>
+      <input type="text" value="javascript" placeholder="#tweets or @user or anything" name="search">
+    </div>
+    <div>
+      <label for="tweets">No. of tweets to show</label>
+      <input type="number" value="10" name="tweets">
+    </div>
+    <div>
+      <label for="tpt">Time (in s) per tweet</label>
+      <input type="number" value="3" name="tpt">
+    </div>
+    <div>
+      <label for="bg">Background colour</label>
+      <input type="color" name="bg" value="#000000">
+    </div>
+    <div>
+      <label for="fg">Text colour</label>
+      <input type="color" name="fg" value="#000000">
+    </div>
+  </form>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+  <script src="js/impress.js"></script>
+  <script>
+  var GoSquared={};
+  GoSquared.q = [];
+  GoSquared.acct = "GSN-757634-O";
+  (function(w){
+    function gs(){
+      w._gstc_lt=+(new Date); var d=document;
+      var g = d.createElement("script"); g.type = "text/javascript"; g.async = true; g.src = "//d1l6p2sc9645hc.cloudfront.net/tracker.js";
+      var s = d.getElementsByTagName("script")[0]; s.parentNode.insertBefore(g, s);
+    }
+    gs();
+  })(window);
+
+  function shadeColor(color, percent) {   
+    var num = parseInt(color.slice(1),16), amt = Math.round(2.55 * percent), R = (num >> 16) + amt, B = (num >> 8 & 0x00FF) + amt, G = (num & 0x0000FF) + amt;
+    return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (B<255?B<1?0:B:255)*0x100 + (G<255?G<1?0:G:255)).toString(16).slice(1);
+  }
+  var bgg = function(hex) {
+    var light = shadeColor(hex,40);
+    return [
+    hex,
+    '-moz-radial-gradient(center, ellipse cover, '+light+' 0%,'+hex+' 100%)',
+    '-webkit-gradient(radial, center center, 0px, center center, 100%, color-stop(0%,'+light+'), color-stop(100%,'+hex+'))',
+    '-webkit-radial-gradient(center, ellipse cover,  '+light+' 0%,'+hex+' 100%)',
+    '-o-radial-gradient(center, ellipse cover,  '+light+' 0%,'+hex+' 100%)',
+    '-ms-radial-gradient(center, ellipse cover,  '+light+' 0%,'+hex+' 100%)',
+    'radial-gradient(ellipse at center,  '+light+' 0%,'+hex+' 100%)'
+    ];
+
+  };
+
+  setTimeout(function() {
+   $('h1').fadeOut(250); 
+ },1000);
+
+
+  var settings = $('#settings');
+
+  settings.find('.toggle').on('click',function(e) {
+    if (e) e.preventDefault();
+    settings.toggleClass('hide');
+    localStorage['hidden'] = settings.hasClass('hide');
+    GoSquared.q.push(['TrackEvent', settings.hasClass('hide') ? 'Hidden Settings' : 'Shown Settings']);
+
+  });
+
+  if (localStorage['search']) settings.find('input[name=search]').val(localStorage['search']);
+  if (localStorage['tweets']) settings.find('input[name=tweets]').val(localStorage['tweets']);
+  if (localStorage['tpt']) settings.find('input[name=tpt]').val(localStorage['tpt']);
+
+  settings.find('input').on('change',function() {
+
+    var name = $(this).attr('name');
+    var val = $(this).val();
+    var old = localStorage[name];
+    localStorage[name] = val;
+
+    GoSquared.q.push(['TrackEvent', 'Changed '+name, {from: old, to:val}]);
+
+    if (name === 'bg') {
+      var newbg = bgg(val);
+      for (var i = 0; i < newbg.length; i++) {
+        $('body').css('background',newbg[i]);
+      }
+      return;
+    }else if (name === 'fg') {
+      return $('body').css('color',val);
+    }
+
+    if (old === val) return;
+    
+    go();
+  });
+
+
+
+  var api,inte;
+
+  if (localStorage['fg']) settings.find('input[name=fg]').val(localStorage['fg']);
+  if (localStorage['bg']) settings.find('input[name=bg]').val(localStorage['bg']);
+  if (localStorage['hidden']) settings.addClass('hide');
+  settings.find('input[type=color]').trigger('change');
+
+  function go() {
+    var search = localStorage['search'] || settings.find('input[name=search]').val();
+    var tweets = localStorage['tweets'] || settings.find('input[name=tweets]').val();
+    var tpt = localStorage['tpt'] || settings.find('input[name=tpt]').val();
+    if (!search || !tweets || !tpt) return;
+    $.getJSON('https://search.twitter.com/search.json?q='+encodeURIComponent(search)+'&rpp='+tweets+'&callback=?',function(data) {
+      if (inte) clearInterval(inte);
+      $('#impress').empty();
+      var res = data.results;
+      var tac = 0;
+      for (var i = 0; i < res.length; i++) {
+        var t = res[i];
+
+        var rand = Math.random();
+        var rotate = rand < 0.25 ? -90 : rand > 0.75 ? 90 : 0;
+        rotate = (rand - 1) * 90;
+
+        var hor = (rotate === 0);
+
+        var scale = Math.random();
+        if (scale < 0.2) scale = 0.2;
+        var across = (Math.random() < 0.5);
+        across = true;
+        if (across) tac++;
+
+        var x = 900 * scale;
+        x += 900*tac;
+
+        var y = 900 * scale;
+        y += 900 * (i-tac);
+
+        if (across) {
+          y = 0
+        } else {
+          x = 0;
+        }
+
+        var div = '<div class="step" data-rotate="'+rotate+'" data-x="'+x+'" data-y="'+y+'" data-scale="'+scale+'" >'
+        div += '<img src="'+t.profile_image_url_https+'">';
+        div += '<hgroup>';
+        div += '<h2>'+t.from_user_name+'</h2>';
+        div += '<h3>@'+t.from_user+'</h3>';
+        div += '</hgroup>';
+        div += '<p>'+t.text+'</p>';
+        div += '</div>';
+        $('#impress').append(div);
+      }
+      api = impress(null,true);
+      api.init();
+
+      done = 0;
+      inte = setInterval(function() {
+        done++;
+        if (done === res.length) {
+          GoSquared.q.push(['TrackEvent', 'Restarted tweet loop']);
+          clearInterval(inte);
+          api.goto(0);
+          return go();
+        }
+        api.next();
+      },tpt * 1000);
+    });
+}
+go();
+
+
+
+</script>
+
+</body>
+</html>
